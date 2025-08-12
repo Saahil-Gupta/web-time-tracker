@@ -3,7 +3,8 @@
     "name": "Web Time Tracker",
     "version": "1.0",
     "description": "Track time spent on websites and view insights.",
-    "permissions": ["tabs", "storage"],
+    "permissions": ["tabs", "storage", "idle"],
+    "host_permissions": [ "<all_urls>" ],
     "background": {
         "service_worker": "background.js"
     },
