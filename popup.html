@@ -8,13 +8,14 @@
 </head>
 <body class="bg-gray-800 text-gray-100 p-4 w-72">
     <h1 class="text-xl font-bold mb-4 text-blue-300">Web Time Tracker</h1>
-    
+    <h2 class="text-lg font-bold mb-4">Today's Usage</h2>
     <div id="summary" class="bg-gray-400 rounded-lg shadow p-3 mb-4">
         <p class="text-sm">You've spent <span id="today-time" class="font-medium">loading...</span> online today.</p>
     </div>
 
-    <canvas id="chart" width="250" height="150"></canvas>
+    <canvas id="usageChart" width="300" height="300"></canvas>
 
+    <script src="libs/chart.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>
