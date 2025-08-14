@@ -1,43 +1,28 @@
+const PREFS_KEY = "uiPrefs";
 let myChart = null;
-let chartType = "bar"; // default
-let sortOption = "time"; // default
+let chartType = "bar";      
+let sortOption = "time";   
+let currentTab = "today";   
 
-document.addEventListener("DOMContentLoaded", () => {
-  const tabs = ["today", "week", "month"];
-  let currentTab = "today";
-
-  tabs.forEach(tab => {
-    document.getElementById(`tab-${tab}`).addEventListener("click", () => {
-      currentTab = tab;
-      updateTabUI(tab);
-      loadData(tab);
+function loadPrefs() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get([PREFS_KEY], (res) => {
+      const defaults = { chartType: "bar", sortOption: "time", activeTab: "today" };
+      const saved = res[PREFS_KEY] || {};
+      resolve({ ...defaults, ...saved });
     });
   });
+}
 
-  // Chart type buttons
-  document.getElementById("chart-bar").addEventListener("click", () => {
-    chartType = "bar";
-    loadData(currentTab);
-  });
-
-  document.getElementById("chart-pie").addEventListener("click", () => {
-    chartType = "pie";
-    loadData(currentTab);
-  });
-
-  // Sorting dropdown
-  document.getElementById("sort-option").addEventListener("change", (e) => {
-    sortOption = e.target.value;
-    loadData(currentTab);
-  });
-
-  updateTabUI(currentTab);
-  loadData(currentTab);
-});
+function savePrefs() {
+  const toSave = { chartType, sortOption, activeTab: currentTab };
+  chrome.storage.sync.set({ [PREFS_KEY]: toSave });
+}
 
 function updateTabUI(activeTab) {
-  ["today", "week", "month"].forEach(tab => {
+  ["today", "week", "month"].forEach((tab) => {
     const btn = document.getElementById(`tab-${tab}`);
+    if (!btn) return;
     if (tab === activeTab) {
       btn.classList.add("bg-blue-500");
       btn.classList.remove("bg-gray-500");
@@ -48,9 +33,41 @@ function updateTabUI(activeTab) {
   });
 }
 
+function setChartButtonsUI() {
+  const barBtn = document.getElementById("chart-bar");
+  const pieBtn = document.getElementById("chart-pie");
+  if (!barBtn || !pieBtn) return;
+
+  if (chartType === "bar") {
+    barBtn.classList.add("bg-blue-500");
+    barBtn.classList.remove("bg-gray-700");
+    pieBtn.classList.add("bg-gray-700");
+    pieBtn.classList.remove("bg-blue-500");
+  } else {
+    pieBtn.classList.add("bg-blue-500");
+    pieBtn.classList.remove("bg-gray-700");
+    barBtn.classList.add("bg-gray-700");
+    barBtn.classList.remove("bg-blue-500");
+  }
+}
+
+function setSortSelectUI() {
+  const select = document.getElementById("sort-option");
+  if (select) select.value = sortOption;
+}
+
+function setSummaryLabelScope() {
+  const summary = document.querySelector("#summary p");
+  if (!summary) return;
+  const scope =
+    currentTab === "today" ? "today" :
+    currentTab === "week" ? "this week" : "this month";
+  summary.innerHTML = `You've spent <span id="today-time" class="font-medium">loading...</span> online ${scope}.`;
+}
+
 function loadData(tab) {
   if (tab === "today") {
-    const todayKey = new Date().toISOString().split('T')[0];
+    const todayKey = new Date().toISOString().split("T")[0];
     fetchAndRender(todayKey);
   } else if (tab === "week") {
     fetchWeekData();
@@ -60,23 +77,22 @@ function loadData(tab) {
 }
 
 function fetchAndRender(key) {
-  chrome.storage.local.get([key], result => {
+  chrome.storage.local.get([key], (result) => {
     const data = result[key] || {};
     renderChart(data);
   });
 }
 
 function fetchWeekData() {
-  chrome.storage.local.get(null, result => {
+  chrome.storage.local.get(null, (result) => {
     const today = new Date();
     const weekData = {};
 
     for (let i = 0; i < 7; i++) {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
-      const key = d.toISOString().split('T')[0];
+      const key = d.toISOString().split("T")[0];
       const dayData = result[key] || {};
-
       for (const site in dayData) {
         weekData[site] = (weekData[site] || 0) + dayData[site];
       }
@@ -86,16 +102,17 @@ function fetchWeekData() {
 }
 
 function fetchMonthData() {
-  chrome.storage.local.get(null, result => {
+  chrome.storage.local.get(null, (result) => {
     const today = new Date();
     const monthData = {};
     const month = today.getMonth();
     const year = today.getFullYear();
 
     for (const key in result) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) continue; 
       const [y, m] = key.split("-").map(Number);
       if (y === year && m - 1 === month) {
-        const dayData = result[key];
+        const dayData = result[key] || {};
         for (const site in dayData) {
           monthData[site] = (monthData[site] || 0) + dayData[site];
         }
@@ -106,9 +123,8 @@ function fetchMonthData() {
 }
 
 function renderChart(data) {
-  let entries = Object.entries(data).map(([site, seconds]) => [site, (seconds / 60).toFixed(1)]);
+  let entries = Object.entries(data).map(([site, seconds]) => [site, +(seconds / 60).toFixed(1)]);
 
-  // Apply sorting
   if (sortOption === "time") {
     entries.sort((a, b) => b[1] - a[1]);
   } else if (sortOption === "name") {
@@ -116,27 +132,28 @@ function renderChart(data) {
   }
 
   let topEntries = entries.slice(0, 5);
-  if (entries.length > 5 && sortOption === "time") {
-    const otherMinutes = entries.slice(5).reduce((sum, e) => sum + parseFloat(e[1]), 0);
-    topEntries.push(["Other", otherMinutes.toFixed(1)]);
+  if (entries.length > 5 && sortOption === "time" && chartType !== "pie") {
+    const otherMinutes = entries.slice(5).reduce((sum, e) => sum + e[1], 0);
+    topEntries.push(["Other", +otherMinutes.toFixed(1)]);
   }
 
-  const labels = topEntries.map(e => e[0]);
-  const values = topEntries.map(e => e[1]);
+  const labels = topEntries.map((e) => e[0]);
+  const values = topEntries.map((e) => e[1]);
 
-  const totalMinutes = values.reduce((sum, val) => sum + parseFloat(val), 0);
-  document.getElementById("today-time").textContent = `${totalMinutes.toFixed(1)} mins`;
+  const totalMinutes = values.reduce((sum, val) => sum + val, 0);
+  const totalEl = document.getElementById("today-time");
+  if (totalEl) totalEl.textContent = `${totalMinutes.toFixed(1)} mins`;
 
   createChart(labels, values);
 }
 
 function createChart(labels, data) {
-  const ctx = document.getElementById('usageChart').getContext('2d');
+  const ctx = document.getElementById("usageChart").getContext("2d");
   if (myChart) myChart.destroy();
 
   const colors = [
-    '#3B82F6', '#F97316', '#10B981',
-    '#EF4444', '#A855F7', '#FBBF24'
+    "#3B82F6", "#F97316", "#10B981",
+    "#EF4444", "#A855F7", "#FBBF24"
   ];
   const chartColors = labels.map((_, i) => colors[i % colors.length]);
 
@@ -145,19 +162,69 @@ function createChart(labels, data) {
     data: {
       labels,
       datasets: [{
-        label: chartType === "bar" ? 'Minutes Spent' : '',
+        label: chartType === "bar" ? "Minutes Spent" : "",
         data,
         backgroundColor: chartColors
       }]
     },
     options: {
       responsive: true,
-      plugins: {
-        legend: { display: chartType === "pie" }
-      },
-      scales: chartType === "bar" ? {
-        y: { beginAtZero: true }
-      } : {}
+      plugins: { legend: { display: chartType === "pie" } },
+      scales: chartType === "bar" ? { y: { beginAtZero: true } } : {}
     }
   });
 }
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const prefs = await loadPrefs();
+  chartType = prefs.chartType;
+  sortOption = prefs.sortOption;
+  currentTab = prefs.activeTab;
+
+  ["today", "week", "month"].forEach((tab) => {
+    const el = document.getElementById(`tab-${tab}`);
+    if (!el) return;
+    el.addEventListener("click", () => {
+      currentTab = tab;
+      updateTabUI(currentTab);
+      setSummaryLabelScope();
+      savePrefs();
+      loadData(currentTab);
+    });
+  });
+
+  const barBtn = document.getElementById("chart-bar");
+  const pieBtn = document.getElementById("chart-pie");
+  if (barBtn) {
+    barBtn.addEventListener("click", () => {
+      chartType = "bar";
+      setChartButtonsUI();
+      savePrefs();
+      loadData(currentTab);
+    });
+  }
+  if (pieBtn) {
+    pieBtn.addEventListener("click", () => {
+      chartType = "pie";
+      setChartButtonsUI();
+      savePrefs();
+      loadData(currentTab);
+    });
+  }
+
+  const sortSelect = document.getElementById("sort-option");
+  if (sortSelect) {
+    sortSelect.addEventListener("change", (e) => {
+      sortOption = e.target.value;
+      savePrefs();
+      loadData(currentTab);
+    });
+  }
+
+  updateTabUI(currentTab);
+  setChartButtonsUI();
+  setSortSelectUI();
+  setSummaryLabelScope();
+
+  loadData(currentTab);
+});
