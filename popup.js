@@ -1,6 +1,10 @@
+let myChart = null;
+let chartType = "bar"; // default
+let sortOption = "time"; // default
+
 document.addEventListener("DOMContentLoaded", () => {
   const tabs = ["today", "week", "month"];
-  let currentTab = "today"; // default
+  let currentTab = "today";
 
   tabs.forEach(tab => {
     document.getElementById(`tab-${tab}`).addEventListener("click", () => {
@@ -8,6 +12,23 @@ document.addEventListener("DOMContentLoaded", () => {
       updateTabUI(tab);
       loadData(tab);
     });
+  });
+
+  // Chart type buttons
+  document.getElementById("chart-bar").addEventListener("click", () => {
+    chartType = "bar";
+    loadData(currentTab);
+  });
+
+  document.getElementById("chart-pie").addEventListener("click", () => {
+    chartType = "pie";
+    loadData(currentTab);
+  });
+
+  // Sorting dropdown
+  document.getElementById("sort-option").addEventListener("change", (e) => {
+    sortOption = e.target.value;
+    loadData(currentTab);
   });
 
   updateTabUI(currentTab);
@@ -28,7 +49,6 @@ function updateTabUI(activeTab) {
 }
 
 function loadData(tab) {
-  // Decide which data to fetch based on tab
   if (tab === "today") {
     const todayKey = new Date().toISOString().split('T')[0];
     fetchAndRender(todayKey);
@@ -39,7 +59,6 @@ function loadData(tab) {
   }
 }
 
-// Fetch and render for one day
 function fetchAndRender(key) {
   chrome.storage.local.get([key], result => {
     const data = result[key] || {};
@@ -47,7 +66,6 @@ function fetchAndRender(key) {
   });
 }
 
-// Week/month logic: sum multiple days
 function fetchWeekData() {
   chrome.storage.local.get(null, result => {
     const today = new Date();
@@ -63,7 +81,6 @@ function fetchWeekData() {
         weekData[site] = (weekData[site] || 0) + dayData[site];
       }
     }
-
     renderChart(weekData);
   });
 }
@@ -72,31 +89,34 @@ function fetchMonthData() {
   chrome.storage.local.get(null, result => {
     const today = new Date();
     const monthData = {};
-    const month = today.getMonth(); // 0-11
+    const month = today.getMonth();
     const year = today.getFullYear();
 
     for (const key in result) {
       const [y, m] = key.split("-").map(Number);
-      if (y === year && m - 1 === month) { // m-1 because JS month is 0-indexed
+      if (y === year && m - 1 === month) {
         const dayData = result[key];
         for (const site in dayData) {
           monthData[site] = (monthData[site] || 0) + dayData[site];
         }
       }
     }
-
     renderChart(monthData);
   });
 }
 
-// Your existing chart logic
 function renderChart(data) {
-  // Sorting, top 5, other, total minutes logic
   let entries = Object.entries(data).map(([site, seconds]) => [site, (seconds / 60).toFixed(1)]);
-  entries.sort((a, b) => b[1] - a[1]);
+
+  // Apply sorting
+  if (sortOption === "time") {
+    entries.sort((a, b) => b[1] - a[1]);
+  } else if (sortOption === "name") {
+    entries.sort((a, b) => a[0].localeCompare(b[0]));
+  }
 
   let topEntries = entries.slice(0, 5);
-  if (entries.length > 5) {
+  if (entries.length > 5 && sortOption === "time") {
     const otherMinutes = entries.slice(5).reduce((sum, e) => sum + parseFloat(e[1]), 0);
     topEntries.push(["Other", otherMinutes.toFixed(1)]);
   }
@@ -110,45 +130,34 @@ function renderChart(data) {
   createChart(labels, values);
 }
 
-
-let myChart = null; // global variable to hold chart instance
-
 function createChart(labels, data) {
   const ctx = document.getElementById('usageChart').getContext('2d');
-
-  if (myChart) {
-    myChart.destroy();
-  }
+  if (myChart) myChart.destroy();
 
   const colors = [
-    '#3B82F6', 
-    '#F97316', 
-    '#10B981',
-    '#EF4444', 
-    '#A855F7', 
-    '#FBBF24'  
+    '#3B82F6', '#F97316', '#10B981',
+    '#EF4444', '#A855F7', '#FBBF24'
   ];
-
-  const barColors = labels.map((_, i) => colors[i % colors.length]);
+  const chartColors = labels.map((_, i) => colors[i % colors.length]);
 
   myChart = new Chart(ctx, {
-    type: 'bar',
+    type: chartType,
     data: {
-      labels: labels,
+      labels,
       datasets: [{
-        label: 'Minutes Spent',
-        data: data,
-        backgroundColor: barColors,
+        label: chartType === "bar" ? 'Minutes Spent' : '',
+        data,
+        backgroundColor: chartColors
       }]
     },
     options: {
       responsive: true,
       plugins: {
-        legend: { display: false }
+        legend: { display: chartType === "pie" }
       },
-      scales: {
+      scales: chartType === "bar" ? {
         y: { beginAtZero: true }
-      }
+      } : {}
     }
   });
 }

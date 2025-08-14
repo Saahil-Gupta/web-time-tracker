@@ -18,6 +18,18 @@
         <button id="tab-week" class="tab-btn bg-gray-700 text-white hover:bg-gray-600 border-2 border-gray-700 px-5 py-3 rounded font-medium">Week</button>
         <button id="tab-month" class="tab-btn bg-gray-700 text-white hover:bg-gray-600 border-2 border-gray-700 px-5 py-3 rounded font-medium">Month</button>
     </div>
+    <div class="flex justify-between items-center mb-4">
+        <div class="space-x-2">
+            <button id="chart-bar" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">Bar</button>
+            <button id="chart-pie" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm">Pie</button>
+        </div>
+        <div>
+            <select id="sort-option" class="bg-gray-700 text-white text-sm rounded px-2 py-1">
+            <option value="time">Sort by Time</option>
+            <option value="name">Sort by Name</option>
+            </select>
+        </div>
+    </div>  
 
     <canvas id="usageChart" width="300" height="300"></canvas>
 
