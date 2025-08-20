@@ -3,6 +3,7 @@ let myChart = null;
 let chartType = "bar";      
 let sortOption = "time";   
 let currentTab = "today";   
+const SETTINGS_KEY = "settings";
 
 function loadPrefs() {
   return new Promise((resolve) => {
@@ -12,6 +13,32 @@ function loadPrefs() {
       resolve({ ...defaults, ...saved });
     });
   });
+}
+
+async function loadSettings() {
+  return new Promise(res => chrome.storage.sync.get([SETTINGS_KEY], r => {
+    res({
+      enableLimit: false,
+      limitMins: 120,
+      enableBlock: false,
+      focusMode: false,
+      focusSites: "",
+      ...(r[SETTINGS_KEY] || {})
+    });
+  }));
+}
+
+function saveSettings(s) {
+  chrome.storage.sync.set({ [SETTINGS_KEY]: s });
+}
+
+function paintProgress(totalMinutes, limitMins, enabled) {
+  const bar = document.getElementById("limit-bar");
+  const lbl = document.getElementById("limit-label");
+  const pct = enabled && limitMins > 0 ? Math.min(100, Math.round((totalMinutes / limitMins) * 100)) : 0;
+  bar.style.width = pct + "%";
+  bar.className = "h-2 rounded " + (pct >= 100 ? "bg-red-500" : pct >= 75 ? "bg-orange-500" : "bg-blue-500");
+  lbl.textContent = `${totalMinutes.toFixed(1)} / ${enabled ? limitMins : 0} mins`;
 }
 
 function savePrefs() {
@@ -141,9 +168,10 @@ function renderChart(data) {
   const values = topEntries.map((e) => e[1]);
 
   const totalMinutes = values.reduce((sum, val) => sum + val, 0);
+  
   const totalEl = document.getElementById("today-time");
   if (totalEl) totalEl.textContent = `${totalMinutes.toFixed(1)} mins`;
-
+  loadSettings().then(s => paintProgress(totalMinutes, s.limitMins, s.enableLimit));
   createChart(labels, values);
 }
 
@@ -174,6 +202,14 @@ function createChart(labels, data) {
     }
   });
 }
+
+document.getElementById("open-settings").addEventListener("click", () => {
+  if (chrome.runtime.openOptionsPage) {
+    chrome.runtime.openOptionsPage();
+  } else {
+    window.open(chrome.runtime.getURL("options.html"));
+  }
+});
 
 document.addEventListener("DOMContentLoaded", async () => {
   const prefs = await loadPrefs();

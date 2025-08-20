@@ -3,10 +3,21 @@
     "name": "Web Time Tracker",
     "version": "1.0",
     "description": "Track time spent on websites and view insights.",
-    "permissions": ["tabs", "storage", "idle"],
+    "permissions": ["tabs", "storage", "idle", "notifications","alarms", "declarativeNetRequest"],
     "host_permissions": [ "<all_urls>" ],
+    "declarative_net_request": {
+        "rule_resources": [{
+            "id": "ruleset_1",
+            "enabled": true,
+            "path": "rules.json"
+        }]
+    },
     "background": {
         "service_worker": "background.js"
+    },
+    "options_ui": {
+        "page": "options.html",
+        "open_in_tab": false
     },
     "action": {
         "default_popup": "popup.html",
