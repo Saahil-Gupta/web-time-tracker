@@ -33,18 +33,22 @@ function saveSettings(s) {
 }
 
 function paintProgress(totalMinutes, limitMins, enabled) {
-  const bar = document.getElementById("limit-bar");
-  const lbl = document.getElementById("limit-label");
-  const pct = enabled && limitMins > 0 ? Math.min(100, Math.round((totalMinutes / limitMins) * 100)) : 0;
+  const bar = document.getElementById("bar");     // <-- matches popup.html
+  if (!bar) return;
+
+  const pct = enabled && limitMins > 0
+    ? Math.min(100, Math.round((totalMinutes / limitMins) * 100))
+    : 0;
+
   bar.style.width = pct + "%";
-  bar.className = "h-2 rounded " + (pct >= 100 ? "bg-red-500" : pct >= 75 ? "bg-orange-500" : "bg-blue-500");
-  lbl.textContent = `${totalMinutes.toFixed(1)} / ${enabled ? limitMins : 0} mins`;
+  bar.className = "h-2 rounded " + (pct >= 100 ? "bg-red-500"
+                          : pct >= 75 ? "bg-orange-500"
+                          : "bg-blue-500");
+
+  const lbl = document.getElementById("limit-label");
+  if (lbl) lbl.textContent = `${totalMinutes.toFixed(1)} / ${enabled ? limitMins : 0} mins`;
 }
 
-function savePrefs() {
-  const toSave = { chartType, sortOption, activeTab: currentTab };
-  chrome.storage.sync.set({ [PREFS_KEY]: toSave });
-}
 
 function updateTabUI(activeTab) {
   ["today", "week", "month"].forEach((tab) => {
