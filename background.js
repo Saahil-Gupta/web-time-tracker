@@ -3,6 +3,7 @@ console.log("Background service worker has started and is firing.");
 let currentTabId = null;
 let currentDomain = null;
 let startTime = null;
+let paused = false;
 
 function getDomainFromUrl(url) {
     try {
@@ -13,8 +14,18 @@ function getDomainFromUrl(url) {
     }
 }
 
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg?.type === "togglePause") {
+        paused = !paused;
+        chrome.runtime.sendMessage({ type: "pauseState", paused });
+    }
+    if (msg?.type === "getPauseState") {
+        sendResponse({ paused });
+    }
+});
+
 async function saveTimeSpent(domain, timeSpent) {
-    if (!domain || timeSpent <= 0) return;
+    if (paused || !domain || timeSpent <= 0) return;
     console.log("Saving time:", domain, timeSpent, "seconds");
     const today = new Date().toISOString().split('T')[0];
 

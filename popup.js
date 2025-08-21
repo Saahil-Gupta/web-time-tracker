@@ -1,9 +1,14 @@
+// run this in terminal to see live changes with tailwind
+// npx @tailwindcss/cli -i ./input.css -o ./output.css -w
+
 const PREFS_KEY = "uiPrefs";
 let myChart = null;
 let chartType = "bar";      
 let sortOption = "time";   
 let currentTab = "today";   
 const SETTINGS_KEY = "settings";
+const pauseBtn = document.getElementById("pause");
+const statusMsg = document.getElementById("status-msg");
 
 function loadPrefs() {
   return new Promise((resolve) => {
@@ -49,6 +54,10 @@ function paintProgress(totalMinutes, limitMins, enabled) {
   if (lbl) lbl.textContent = `${totalMinutes.toFixed(1)} / ${enabled ? limitMins : 0} mins`;
 }
 
+function savePrefs() {
+  const toSave = { chartType, sortOption, activeTab: currentTab };
+  chrome.storage.sync.set({ [PREFS_KEY]: toSave });
+}
 
 function updateTabUI(activeTab) {
   ["today", "week", "month"].forEach((tab) => {
@@ -213,6 +222,24 @@ document.getElementById("open-settings").addEventListener("click", () => {
   } else {
     window.open(chrome.runtime.getURL("options.html"));
   }
+});
+
+function updatePauseUI(paused) {
+  if (!pauseBtn || !statusMsg) return;
+  pauseBtn.textContent = paused ? "Resume Tracking" : "Pause Tracking";
+  statusMsg.classList.toggle("hidden", !paused);
+}
+
+pauseBtn?.addEventListener("click", () => {
+  chrome.runtime.sendMessage({ type: "togglePause" });
+});
+
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.type === "pauseState") updatePauseUI(msg.paused);
+});
+
+chrome.runtime.sendMessage({ type: "getPauseState" }, (res) => {
+  if (res) updatePauseUI(res.paused);
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
